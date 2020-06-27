@@ -1,0 +1,145 @@
+%
+% NOTE -- ONLY EDIT PAGI.Rnw!!!
+% PAGI.tex file will get overwritten.
+%
+%\VignetteIndexEntry{PAGI Overview}
+%\VignetteKeywords{pathway}
+%\VignettePackage{PAGI}
+%\VignetteDepends{igraph}
+
+\documentclass[10pt]{article}
+
+\usepackage{hyperref}
+\usepackage[pdftex]{graphicx}
+\SweaveOpts{keep.source=TRUE,eps=FALSE,pdf=TRUE,prefix=FALSE} 
+\author{Junwei Han,Yanjun Xu,Haixiu Yang,Chunquan Li and Xia Li}
+
+\textwidth=6.2in
+\textheight=8.5in
+%\parskip=.3cm
+\oddsidemargin=.1in
+\evensidemargin=.1in
+\headheight=-.3in
+
+\newcommand{\xiaowuhao}{\fontsize{9pt}{\baselineskip}\selectfont}
+\newcommand{\liuhao}{\fontsize{7.875pt}{\baselineskip}\selectfont}
+\newcommand{\qihao}{\fontsize{5.25pt}{\baselineskip}\selectfont}
+
+\newcommand\Rpackage[1]{{\textsf{#1}\index{#1 (package)}}}
+\newcommand\RpackageNoindex[1]{{\textsf{#1}}}
+\newcommand\Rclass[1]{{\textit{#1}\index{#1 (class)}}}
+\newcommand\Rfunction[1]{{{\small\texttt{#1}}\index{#1 (function)}}}
+\newcommand\Rmethod[1]{{\small\texttt{#1}}}
+\newcommand\Rcommand[1]{{{\small\texttt{#1}}\index{#1 (function)}}}
+\newcommand\Rfunarg[1]{{\small\texttt{#1}}}
+\newcommand\Robject[1]{{\small\texttt{#1}}}
+\bibliographystyle{plainnat}
+
+\begin{document}
+\setkeys{Gin}{width=1.0\textwidth}
+\title{How To Use PAGI}
+\maketitle
+\tableofcontents
+
+\section{Overview}
+This vignette demonstrates how to easily use the \Rpackage{PAGI} package. This package can identify canonical KEGG pathways associated with two different biological states. Our system provides a new strategies of identifying pathways based on global influnce based on global influence from both the internal effect of pathways and crosstalk between pathways(see the section \ref{GraphSection}).
+<<echo=FALSE>>=
+library(PAGI)
+@ 
+
+\section{Identifying canonical biological pathways based on global influence from both the internal effect of pathways and crosstalk between pathways}\label{GraphSection}
+
+The section introduces our pathway analysis based on global influence (PAGI) method for identifying canonical biological pathways associated with different biological states. PAGI used a network-based approach to find the latent dysregulated pathways by considering the global influence from both the internal effect of pathways and crosstalk between pathways. Firstly, we constructed a global gene-gene network based on the relationships of genes extracted from each pathway in KEGG database and the overlapped genes between pathways. The global gene-gene network data is stored in the environmental variable (netWorkdata). The expression profiles data with normal and disease samples were mapped to the global network. Then we defined a global influence factor (GIF) to distinguish the non-equivalence of gene influenced by both internal effect of pathways and crosstalk between pathways in the global network. The random walk with restart (RWR) algorithm was used to evaluate the GIF score by integrating the global network topology and the correlation of gene with phenotype (see the section \ref{getGIF}). We used the function \Rfunction{CalGIF} to calculate the GIF scores. Finally, we used cumulative distribution functions (CDFs) to prioritize the dysregulated pathways ((see the section \ref{getpathway})). We used the function \Rfunction{PAGI.Main} to prioritize the pathways.
+
+\subsection{Calculating the scores of global influence factors (GIFs)}\label{getGIF}
+
+The random walk with restart (RWR) algorithm was used to evaluate the GIF by integrating the global network topology and the correlation of gene with phenotype.
+
+The function \Rfunction{CalGIF} can calculate the GIF scores of genes in the gene expression data which is inputed by user. The following commands can calculate the scores of GIFs in a given dataset.
+
+<<>>= 
+#example 1
+#get example data
+dataset<-getdataset()
+class.labels<-getclass.labels()
+#calculate the global influence factor (GIF)
+GIFscore<-CalGIF(dataset,class.labels)
+#print the top ten results to screen
+GIFscore[rev(order(GIFscore))][1:10]
+#example 2
+#get example data
+dataset<-read.table(paste(system.file(package="PAGI"),"/localdata/dataset.txt",sep=""),
+header=T,sep="\t",quote="\"")
+class.labels<-as.character(read.table(paste(system.file(package="PAGI"),
+"/localdata/class.labels.txt",sep=""),quote="\"", stringsAsFactors=FALSE)[1,])
+#calculate the global influence factor (GIF)
+GIFscore<-CalGIF(dataset,class.labels)
+#print the top ten results to screen
+GIFscore[rev(order(GIFscore))][1:10]
+@
+
+\subsection{Identifying pathways based on global influence}\label{getpathway}
+
+The function \Rfunction{PAGI.Main} can identify dysregulated pathways which may be associated with two bilogical states. The result is a list. It includes two elements: summary result and pathway list. Summary result is a dataframe. It is the summary of the result of pathways. Each rows of the dataframe represents a pathway. Its columns include "Pathway Name", "SIZE", "PathwayID", "Pathway Score",  "NOM p-val", "FDR q-val", "Tag percentage" (Percent of gene set before running enrichment peak), "Gene percentage" (Percent of gene list before running enrichment peak), "Signal strength" (enrichment signal strength). Pathway list is of pathways which present the detail results of pathways with NOM p-val< p.val.threshold or FDR< FDR.threshold. Each element of the list is a dataframe. Each rows of the dataframe represents a gene. Its columns include "Gene number in the (sorted) pathway", "gene symbol from the gene express data", "location of the gene in the sorted gene list", "the T-score of gene between two biological states", "global influence impactor", "if the gene contribute to the score of pathway".
+The following commands can identify the dysregulated pathways in a given dataset with default parameters.
+
+<<>>=
+#example 1
+#get example data
+dataset<-getdataset()
+class.labels<-getclass.labels()
+#identify dysregulated pathways
+result<-PAGI.Main(dataset,class.labels,nperm = 100,p.val.threshold = -1,FDR.threshold = 0.01,
+gs.size.threshold.min = 25, gs.size.threshold.max = 500 )
+#print the summary results of top ten pathways to screen
+result[[1]][1:10,]
+#print the detail results of top ten genes in the first pathway to screen
+result[[2]][[1]][1:10,]
+#write the summary results of pathways to tab delimited file. 
+write.table(result[[1]], file = "SUMMARY RESULTS.txt", quote=F, row.names=F, sep = "\t")
+#write the detail results of genes for each pathway with FDR.threshold< 0.01 to tab delimited file. 
+for(i in 1:length(result[[2]])){
+gene.report<-result[[2]][[i]]
+filename <- paste(names(result[[2]][i]),".txt", sep="", collapse="")
+write.table(gene.report, file = filename, quote=F, row.names=F, sep = "\t")
+}
+#example 2
+#get example data
+dataset<-read.table(paste(system.file(package="PAGI"),"/localdata/dataset.txt",sep=""),
+header=T,sep="\t",quote="\"")
+class.labels<-as.character(read.table(paste(system.file(package="PAGI"),
+"/localdata/class.labels.txt",sep=""),quote="\"", stringsAsFactors=FALSE)[1,])
+#identify dysregulated pathways
+result<-PAGI.Main(dataset,class.labels,nperm = 100,p.val.threshold = -1,FDR.threshold = 0.01,
+gs.size.threshold.min = 25, gs.size.threshold.max = 500 )
+#print the summary results of top ten pathways to screen
+result[[1]][1:10,]
+#print the detail results of top ten genes in the first pathway to screen
+result[[2]][[1]][1:10,]
+#write the summary results of pathways to tab delimited file. 
+write.table(result[[1]], file = "SUMMARY RESULTS.txt", quote=F, row.names=F, sep = "\t")
+#write the detail results of genes for each pathway with FDR.threshold< 0.01 to tab delimited file. 
+for(i in 1:length(result[[2]])){
+gene.report<-result[[2]][[i]]
+filename <- paste(names(result[[2]][i]),".txt", sep="", collapse="")
+write.table(gene.report, file = filename, quote=F, row.names=F, sep = "\t")
+}
+@ 
+
+\newpage
+\section{Session Info}
+The script runs within the following session:
+<<sessionInfo, echo=FALSE, results=verbatim>>=
+sessionInfo()
+@
+
+\begin{thebibliography}{}
+
+\bibitem[Li {\it et~al}., 2009]{Li2009} Li, C., et al. (2009) Subpathwayminer: A Software Package for Flexible Identification of Pathways. Nucleic Acids Res, 37, e131.
+
+\bibitem[Subramanian {\it et~al}., 2005]{Subramanian2008} Subramanian, A., et al. (2008) Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles. Proc Natl Acad Sci U S A, 102, 15545-15550.
+
+
+\end{thebibliography}
+
+\end{document}
